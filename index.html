@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Flowline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{margin:0}
+
+/* Layout: drafting-sheet game with four screens (menu, level tree, shop, board). Copper pipes on blueprint paper, liquids in primary colours. */
+:root{
+  --bg:#e7edf3; --ink:#13202c; --ink-soft:#4b5d6e; --cell:#f3f6f9; --grid:#c3d0dc; --frame:#13202c;
+  --pipe:#b8782f; --pipe-edge:#5e3b12; --pipe-hi:#e8b06a;
+  --water:#1389d4; --leak:#d4432c; --accent:#1389d4; --on-accent:#ffffff; --panel:#f8fafc;
+  --coin:#e0a800; --coin-edge:#8a6500; --coin-hi:#ffe08a;
+  --font-display:'Chakra Petch',system-ui,sans-serif; --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0c1620; --ink:#dbe6ef; --ink-soft:#8aa0b3; --cell:#112130; --grid:#1d3347; --frame:#3a566d;
+    --pipe:#c98a42; --pipe-edge:#583813; --pipe-hi:#efbb7c;
+    --water:#3dbfff; --leak:#ff6b4e; --accent:#3dbfff; --on-accent:#06202f; --panel:#10202e;
+    --coin:#f0b90b; --coin-edge:#7a5a00; --coin-hi:#ffe9a3;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0c1620; --ink:#dbe6ef; --ink-soft:#8aa0b3; --cell:#112130; --grid:#1d3347; --frame:#3a566d;
+  --pipe:#c98a42; --pipe-edge:#583813; --pipe-hi:#efbb7c;
+  --water:#3dbfff; --leak:#ff6b4e; --accent:#3dbfff; --on-accent:#06202f; --panel:#10202e;
+  --coin:#f0b90b; --coin-edge:#7a5a00; --coin-hi:#ffe9a3;
+  color-scheme:dark;
+}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--font-mono); font-size:14px; line-height:1.5;
+  padding-block:20px 28px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap{max-width:760px;margin:0 auto}
+.view{display:flex;flex-direction:column;gap:16px}
+[hidden]{display:none!important}
+h1,h2,h3{font-family:var(--font-display);text-transform:uppercase;letter-spacing:.03em;margin:0;line-height:1.05}
+h1{font-weight:700;font-size:34px}
+h2{font-weight:700;font-size:26px}
+.sub{margin:6px 0 0;color:var(--ink-soft);font-size:13px}
+.topbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.spacer{flex:1}
+.coins{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--frame);padding:6px 12px;font-variant-numeric:tabular-nums;font-weight:500}
+.coin{display:inline-block;width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 35% 35%,var(--coin-hi),var(--coin));border:1.5px solid var(--coin-edge)}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;border:1.5px solid var(--ink);vertical-align:-1px;margin-right:4px}
+button{font:500 14px var(--font-mono);color:var(--ink);background:transparent;border:2px solid var(--frame);padding:10px 16px;cursor:pointer;letter-spacing:.03em}
+button:hover{background:color-mix(in srgb, var(--ink) 8%, transparent)}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);flex:1 1 160px}
+button.primary:hover{background:var(--accent);filter:brightness(1.08)}
+button.small{padding:6px 12px;font-size:13px}
+
+/* menu */
+.hero{display:flex;flex-direction:column;gap:6px;border-bottom:2px solid var(--frame);padding-bottom:14px}
+.hero h1{font-size:48px}
+.motif{display:block;width:100%;max-width:520px;height:auto;align-self:center}
+.motif .m-edge{stroke:var(--skin-edge,var(--pipe-edge))}
+.motif .m-pipe{stroke:var(--skin-pipe,var(--pipe))}
+.motif .m-hi{stroke:var(--skin-hi,var(--pipe-hi))}
+.motif .m-water{stroke:var(--mw,var(--water));stroke-dasharray:14 22;animation:flow 1.1s linear infinite}
+.motif .m-tank{fill:var(--mw,var(--water));stroke:var(--skin-edge,var(--pipe-edge));stroke-width:3}
+.motif .m-drain{fill:var(--cell);stroke:var(--skin-edge,var(--pipe-edge));stroke-width:3}
+@keyframes flow{to{stroke-dashoffset:-36}}
+@media (prefers-reduced-motion:reduce){.motif .m-water{animation:none}}
+.menu-actions{display:flex;flex-direction:column;gap:10px}
+.menu-actions button{padding:14px 18px;font-size:16px;text-align:left;display:flex;justify-content:space-between;align-items:center;gap:12px;font-family:var(--font-display);font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.menu-actions button.primary{flex:none}
+.menu-actions .meta{font:400 12px var(--font-mono);letter-spacing:0;text-transform:none;opacity:.85}
+.menu-stats{display:flex;gap:18px;flex-wrap:wrap;color:var(--ink-soft);font-size:12px}
+.menu-stats b{color:var(--ink);font-weight:500}
+
+/* tree */
+.tree-scroll{border:2px solid var(--frame);background:var(--cell);height:min(68vh,640px);overflow-y:auto;overflow-x:hidden}
+.tree-svg{display:block;width:100%;max-width:440px;margin:0 auto;height:auto}
+.t-link{stroke:var(--grid);stroke-width:4;fill:none}
+.t-link.done{stroke:var(--accent)}
+.t-node{cursor:pointer;outline:none}
+.t-node circle,.t-node rect{fill:var(--cell);stroke:var(--frame);stroke-width:2}
+.t-node.locked{opacity:.4;cursor:default}
+.t-node.open circle,.t-node.open rect{stroke:var(--accent);stroke-width:4}
+.t-node.done circle,.t-node.done rect{fill:var(--accent);stroke:var(--accent)}
+.t-node:focus-visible circle,.t-node:focus-visible rect{stroke:var(--ink);stroke-width:4}
+.t-node text{font:700 14px var(--font-display);fill:var(--ink);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.t-node.done text{fill:var(--on-accent)}
+.t-star{fill:var(--grid)}
+.t-star.on{fill:var(--coin)}
+.t-label{font:500 11px var(--font-mono);fill:var(--ink-soft);letter-spacing:.08em;text-transform:uppercase;text-anchor:end}
+.legend{margin:0;color:var(--ink-soft);font-size:12px}
+
+/* shop */
+.tabs{display:flex;gap:0}
+.tabs button{margin-left:-2px}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.card{border:2px solid var(--frame);padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--panel);min-width:0}
+.card.eq{border-color:var(--accent)}
+.card h3{font-size:16px}
+.card svg{display:block;width:100%;height:auto;background:var(--cell);border:1px solid var(--grid)}
+.price{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-soft)}
+
+/* board */
+.hud{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;border-bottom:2px solid var(--frame);padding-bottom:12px}
+.stats{display:flex;gap:0;margin:0}
+.stats div{border:1px solid var(--frame);padding:4px 14px 6px;margin-left:-1px;min-width:64px}
+.stats dt{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)}
+.stats dd{margin:0;font-family:var(--font-display);font-weight:700;font-size:22px;font-variant-numeric:tabular-nums}
+.brief{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.jobs{display:flex;gap:8px 16px;flex-wrap:wrap}
+.job{border:1px solid var(--frame);padding:3px 10px;background:var(--panel)}
+.brief small{color:var(--ink-soft);font-size:12px}
+.board-wrap{position:relative;align-self:center;max-width:100%;border:2px solid var(--frame);background:var(--cell)}
+#board{display:block;touch-action:manipulation;cursor:pointer;outline:none}
+#board:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.win{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--bg) 72%, transparent);padding:16px}
+.win-card{background:var(--panel);border:2px solid var(--frame);padding:20px 24px;max-width:340px;width:100%;display:flex;flex-direction:column;gap:10px}
+.win-card p{margin:0;color:var(--ink-soft)}
+.stars{display:flex;gap:6px}
+.star{width:26px;height:26px;background:var(--grid);clip-path:polygon(50% 0,62% 36%,100% 38%,70% 60%,80% 100%,50% 76%,20% 100%,30% 60%,0 38%,38% 36%)}
+.star.on{background:var(--coin)}
+.win-actions{display:flex;gap:8px;flex-wrap:wrap}
+.controls{display:flex;gap:10px;flex-wrap:wrap}
+#status{margin:0;min-height:3em;color:var(--ink)}
+.hint{margin:0;color:var(--ink-soft);font-size:12px}
+@media (max-width:520px){h1{font-size:28px}.hero h1{font-size:40px}.stats div{padding:4px 10px 6px;min-width:54px}}
+</style>
+</head>
+<body>
+<main class="wrap">
+
+  <section class="view" id="v-menu">
+    <div class="hero">
+      <h1>Flowline</h1>
+      <p class="sub">Turn the pipes. Seal the line. Fill the drain.</p>
+    </div>
+    <svg class="motif" viewBox="0 0 520 120" aria-hidden="true">
+      <rect class="m-tank" x="8" y="34" width="52" height="52" rx="8"/>
+      <rect class="m-drain" x="460" y="34" width="52" height="52" rx="8"/>
+      <g fill="none" stroke-linejoin="round">
+        <path class="m-edge" d="M50 60 H150 Q190 60 190 20 V20 M190 20 H190" stroke-width="30" style="display:none"/>
+        <path class="m-edge" d="M50 60 H150 Q180 60 180 90 Q180 100 200 100 H330 Q360 100 360 60 Q360 20 400 20 H420 Q440 20 440 60 H470" stroke-width="30"/>
+        <path class="m-pipe" d="M50 60 H150 Q180 60 180 90 Q180 100 200 100 H330 Q360 100 360 60 Q360 20 400 20 H420 Q440 20 440 60 H470" stroke-width="22"/>
+        <path class="m-hi" d="M50 54 H150 Q174 54 174 90 Q174 94 200 94 H330 Q354 94 354 60 Q354 14 400 14 H420 Q446 14 446 60 H470" stroke-width="3" opacity=".8"/>
+        <path class="m-water" d="M50 60 H150 Q180 60 180 90 Q180 100 200 100 H330 Q360 100 360 60 Q360 20 400 20 H420 Q440 20 440 60 H470" stroke-width="10"/>
+      </g>
+    </svg>
+    <div class="menu-actions">
+      <button class="primary" id="mContinue"><span id="mContinueLabel">Continue</span><span class="meta" id="mContinueMeta"></span></button>
+      <button data-nav="tree"><span>Level tree</span><span class="meta" id="mTreeMeta"></span></button>
+      <button data-nav="shop"><span>Shop</span><span class="meta" id="mShopMeta"></span></button>
+    </div>
+    <div class="menu-stats" id="mStats"></div>
+    <p class="hint">Tap a pipe to turn it a quarter clockwise. Right-click turns it back. Open the valve to test the line. You win when every drain gets the right liquid and no pipe end is left open.</p>
+  </section>
+
+  <section class="view" id="v-tree" hidden>
+    <div class="topbar">
+      <button class="small" data-nav="menu">Menu</button>
+      <span class="spacer"></span>
+      <span class="coins"><i class="coin"></i><b class="coin-val"></b></span>
+    </div>
+    <h2>Level tree</h2>
+    <div class="tree-scroll" id="treeScroll"><svg class="tree-svg" id="treeSvg" viewBox="0 0 380 3820" role="group" aria-label="Level tree"></svg></div>
+    <p class="legend">Round nodes are the main line. Diamonds are bonus sheets that pay double coins. Finish a sheet to open the next.</p>
+  </section>
+
+  <section class="view" id="v-shop" hidden>
+    <div class="topbar">
+      <button class="small" data-nav="menu">Menu</button>
+      <span class="spacer"></span>
+      <span class="coins"><i class="coin"></i><b class="coin-val"></b></span>
+    </div>
+    <h2>Shop</h2>
+    <div class="tabs" role="group" aria-label="Shop category">
+      <button id="tabPipe" aria-pressed="true">Pipes</button>
+      <button id="tabWater" aria-pressed="false">Water</button>
+    </div>
+    <p class="legend" id="shopNote"></p>
+    <div class="shop-grid" id="shopGrid"></div>
+  </section>
+
+  <section class="view" id="v-game" hidden>
+    <div class="topbar">
+      <button class="small" data-nav="menu">Menu</button>
+      <button class="small" data-nav="tree">Levels</button>
+      <span class="spacer"></span>
+      <span class="coins"><i class="coin"></i><b class="coin-val"></b></span>
+    </div>
+    <header class="hud">
+      <div>
+        <h1>Sheet <span id="gLabel">1</span></h1>
+        <p class="sub" id="gTier"></p>
+      </div>
+      <dl class="stats">
+        <div><dt>Turns</dt><dd id="sMoves">0</dd></div>
+        <div><dt>Par</dt><dd id="sPar">0</dd></div>
+      </dl>
+    </header>
+    <div class="brief" id="brief"></div>
+    <section class="board-wrap" id="boardWrap">
+      <canvas id="board" tabindex="0" aria-label="Pipe board. Arrow keys move, space turns the pipe, F opens the valve."></canvas>
+      <div class="win" id="win" hidden>
+        <div class="win-card">
+          <h2>Line open</h2>
+          <div class="stars" id="winStars"></div>
+          <p id="winText"></p>
+          <div class="win-actions">
+            <button class="primary" id="next">Next sheet</button>
+            <button id="winTree">Level tree</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <div class="controls">
+      <button class="primary" id="flow">Open valve</button>
+      <button id="reset">Reset</button>
+    </div>
+    <p id="status" role="status" aria-live="polite"></p>
+  </section>
+
+</main>
+
+<script>
+(() => {
+  const DR = [-1, 0, 1, 0], DC = [0, 1, 0, -1];            // N E S W
+  const STEP = 0.26;
+  const rotMask = (m, k) => { k = ((k % 4) + 4) % 4; for (let i = 0; i < k; i++) m = ((m << 1) | (m >> 3)) & 15; return m; };
+  const $ = id => document.getElementById(id);
+  const root = document.documentElement;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- seeded random so every sheet is the same every time ---------- */
+  function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  let rng = Math.random;
+  const ri = n => Math.floor(rng() * n);
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = ri(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+  /* ---------- liquids: 1 red, 2 yellow, 4 blue, mixes are bitwise OR, 8 is plain water ---------- */
+  const LIQ = { 1: ['red', '#e5484d'], 2: ['yellow', '#f4c20d'], 4: ['blue', '#3b82f6'], 3: ['orange', '#f97316'], 6: ['green', '#22b455'], 5: ['purple', '#9b5de5'], 7: ['brown', '#8a5a34'], 8: ['water', null] };
+  let curWater = '#1389d4';
+  const liqHex = b => b === 8 ? curWater : LIQ[b][1];
+  const liqName = b => LIQ[b][0];
+
+  /* ---------- shop catalogue ---------- */
+  const PIPES = [
+    { id: 'copper', name: 'Copper', price: 0, c: null },
+    { id: 'steel', name: 'Steel', price: 30, c: ['#8d9aa8', '#3d4752', '#d3dde6'] },
+    { id: 'brass', name: 'Brass', price: 45, c: ['#c9a227', '#6b5410', '#f2dc7a'] },
+    { id: 'rose', name: 'Rose gold', price: 70, c: ['#d98f86', '#7a3f39', '#f6c9c2'] },
+    { id: 'graphite', name: 'Graphite', price: 90, c: ['#4d5964', '#1b2228', '#8795a1'] },
+    { id: 'verdigris', name: 'Verdigris', price: 120, c: ['#3f9d8a', '#17483f', '#8fdac9'] }
+  ];
+  const WATERS = [
+    { id: 'aqua', name: 'Aqua', price: 0, c: null },
+    { id: 'teal', name: 'Teal', price: 20, c: '#12b3a0' },
+    { id: 'lime', name: 'Lime', price: 30, c: '#7cc520' },
+    { id: 'violet', name: 'Violet', price: 45, c: '#8f6bff' },
+    { id: 'pink', name: 'Pink', price: 60, c: '#ec4899' },
+    { id: 'gold', name: 'Gold', price: 80, c: '#e0a800' }
+  ];
+
+  /* ---------- save data ---------- */
+  let S = { coins: 0, done: {}, owned: { pipe: ['copper'], water: ['aqua'] }, equip: { pipe: 'copper', water: 'aqua' }, last: 1 };
+  try { const j = JSON.parse(localStorage.getItem('flowline.save3')); if (j) S = Object.assign(S, j); } catch (e) {}
+  const save = () => { try { localStorage.setItem('flowline.save3', JSON.stringify(S)); } catch (e) {} };
+
+  function applySkins() {
+    const p = PIPES.find(x => x.id === S.equip.pipe) || PIPES[0], w = WATERS.find(x => x.id === S.equip.water) || WATERS[0];
+    const set = (k, v) => v ? root.style.setProperty(k, v) : root.style.removeProperty(k);
+    set('--skin-pipe', p.c && p.c[0]); set('--skin-edge', p.c && p.c[1]); set('--skin-hi', p.c && p.c[2]); set('--mw', w.c);
+  }
+
+  /* ---------- the level tree ---------- */
+  const TIERS = [
+    { k: 'A', name: 'One liquid', from: 1 }, { k: 'B', name: 'Two liquids', from: 9 }, { k: 'C', name: 'Mixing', from: 17 },
+    { k: 'D', name: 'Mix and pure', from: 25 }, { k: 'E', name: 'Double mix', from: 33 }
+  ];
+  const SIZES = { A: [4, 4, 5, 5, 5, 6, 6, 6], B: [5, 5, 6, 6, 6, 7, 7, 7], C: [5, 5, 6, 6, 6, 7, 7, 7], D: [6, 6, 7, 7, 7, 8, 8, 8], E: [7, 7, 8, 8, 8, 8, 8, 8] };
+  const TRUNK = 40, ROW = 92, CX = 190, TREE_H = TRUNK * ROW + 140;
+  const Y = t => TREE_H - 70 - (t - 1) * ROW;
+  const NODES = [], byId = {};
+  const addNode = o => { NODES.push(o); byId[o.id] = o; };
+  for (let t = 1; t <= TRUNK; t++) addNode({ id: t, label: String(t), t, bonus: false, parent: t > 1 ? t - 1 : null, x: CX, y: Y(t) });
+  for (let k = 1; k <= 9; k++) {
+    const t = 4 * k, side = k % 2 ? 1 : -1, a = 100 + k * 10 + 1, b = a + 1;
+    addNode({ id: a, label: t + 'a', t, bonus: true, parent: t, x: CX + side * 72, y: Y(t) - 46, next: b });
+    addNode({ id: b, label: t + 'b', t, bonus: true, parent: a, x: CX + side * 124, y: Y(t) - 92, next: t + 1 });
+  }
+  const tierIdx = t => TIERS.reduce((a, tr, i) => t >= tr.from ? i : a, 0);
+  const unlocked = n => n.parent === null || !!S.done[n.parent];
+  const nextOf = n => n.bonus ? byId[n.next] : byId[n.t + 1];
+
+  function specFor(node) {
+    const t = node.t, ti = tierIdx(t), tier = TIERS[ti].k, i = (t - 1) % 8, d = t / TRUNK;
+    let n = SIZES[tier][i]; if (node.bonus) n = Math.max(tier === 'A' ? 4 : 5, n - 1);
+    const cross = (tier === 'B' && i >= 3) || (tier === 'C' && i >= 2) || tier === 'D' || tier === 'E';
+    return { tier, ti, n, cross, wind: 0.25 + 0.75 * d, d };
+  }
+
+  /* ---------- level generation ---------- */
+  function makeJobs(tier) {
+    const P = [1, 2, 4], two = () => { const a = P[ri(3)]; let b = P[ri(3)]; while (b === a) b = P[ri(3)]; return [a, b]; };
+    if (tier === 'A') return [{ src: [8], need: 8 }];
+    if (tier === 'B') { const [a, b] = two(); return [{ src: [a], need: a }, { src: [b], need: b }]; }
+    if (tier === 'C') { const [a, b] = two(); return [{ src: [a, b], need: a | b }]; }
+    if (tier === 'D') { const [a, b] = two(), c = P[ri(3)]; return [{ src: [a, b], need: a | b }, { src: [c], need: c }]; }
+    const [a, b] = two(); let c, d, g = 0; do { [c, d] = two(); g++; } while ((c | d) === (a | b) && g < 20);
+    return [{ src: [a, b], need: a | b }, { src: [c, d], need: c | d }];
+  }
+
+  function tryGen(spec) {
+    const n = spec.n, rows = n, cols = n + 2;
+    const conn = Array.from({ length: rows }, () => Array(cols).fill(0)), resv = new Set();
+    const jobs = makeJobs(spec.tier);
+    const nSrc = jobs.reduce((a, j) => a + j.src.length, 0);
+    const srows = shuffle([...Array(rows).keys()]).slice(0, nSrc), drows = shuffle([...Array(rows).keys()]).slice(0, jobs.length);
+    let si = 0; jobs.forEach((j, i) => { j.srows = j.src.map(() => srows[si++]); j.drow = drows[i]; });
+    const key = (r, c) => r * 50 + c;
+    jobs.forEach(j => { j.srows.forEach(r => resv.add(key(r, 1))); resv.add(key(j.drow, n)); });
+    const occ = (r, c) => conn[r][c] !== 0 || resv.has(key(r, c));
+    const legs = jobs.reduce((a, j) => a + (j.src.length > 1 ? 3 : 1), 0);
+    const extraMin = Math.floor(spec.wind * n * 0.6 / Math.max(1, legs / 2)), extraMax = extraMin + n;
+
+    function carve(sr, sc, er, ec) {
+      const man = Math.abs(sr - er) + Math.abs(sc - ec), minLen = man + 1 + extraMin, maxLen = man + 1 + extraMax;
+      const seen = new Set([key(sr, sc)]), path = [[sr, sc]]; let budget = 5000;
+      function dfs(r, c) {
+        if (--budget < 0) return false;
+        if (r === er && c === ec) return path.length >= minLen;
+        if (path.length >= maxLen) return false;
+        const dirs = [0, 1, 2, 3].map(d => ({ d, s: Math.abs(r + DR[d] - er) + Math.abs(c + DC[d] - ec) + rng() * 2.2 })).sort((a, b) => a.s - b.s).map(x => x.d);
+        for (const d of dirs) {
+          const nr = r + DR[d], nc = c + DC[d];
+          if (nr < 0 || nr >= rows || nc < 1 || nc > n || seen.has(key(nr, nc))) continue;
+          const isEnd = nr === er && nc === ec;
+          if (isEnd && occ(nr, nc) && !resv.has(key(nr, nc))) continue;
+          if (!isEnd && occ(nr, nc)) {
+            if (!spec.cross || conn[nr][nc] !== (d % 2 === 0 ? 10 : 5) || resv.has(key(nr, nc))) continue;
+            const qr = nr + DR[d], qc = nc + DC[d];
+            if (qr < 0 || qr >= rows || qc < 1 || qc > n || seen.has(key(qr, qc))) continue;
+            if (occ(qr, qc) && !(qr === er && qc === ec && resv.has(key(qr, qc)))) continue;
+            seen.add(key(nr, nc)); seen.add(key(qr, qc)); path.push([nr, nc], [qr, qc]);
+            if (dfs(qr, qc)) return true;
+            path.pop(); path.pop(); seen.delete(key(nr, nc)); seen.delete(key(qr, qc));
+            continue;
+          }
+          seen.add(key(nr, nc)); path.push([nr, nc]);
+          if (dfs(nr, nc)) return true;
+          path.pop(); seen.delete(key(nr, nc));
+        }
+        return false;
+      }
+      if (!dfs(sr, sc)) return null;
+      for (let i = 0; i + 1 < path.length; i++) {
+        const [r, c] = path[i], [r2, c2] = path[i + 1];
+        for (let d = 0; d < 4; d++) if (r + DR[d] === r2 && c + DC[d] === c2) { conn[r][c] |= 1 << d; conn[r2][c2] |= 1 << ((d + 2) % 4); }
+      }
+      return path;
+    }
+
+    const order = jobs.slice().sort((a, b) => b.src.length - a.src.length);
+    for (const j of order) {
+      if (j.src.length === 1) {
+        const sr = j.srows[0];
+        if (conn[sr][1] !== 0) return null;
+        if (!carve(sr, 1, j.drow, n)) return null;
+        conn[sr][1] |= 8; conn[j.drow][n] |= 2;
+      } else {
+        let jr, jc, g = 0;
+        do { jr = ri(rows); jc = 2 + ri(Math.max(1, n - 2)); g++; } while ((occ(jr, jc) || j.srows.some(r => r === jr && jc === 1)) && g < 40);
+        if (occ(jr, jc)) return null;
+        resv.add(key(jr, jc));
+        for (const sr of j.srows) { if (conn[sr][1] !== 0) return null; if (!carve(sr, 1, jr, jc)) return null; conn[sr][1] |= 8; }
+        if (conn[j.drow][n] !== 0) return null;
+        if (!carve(jr, jc, j.drow, n)) return null;
+        conn[j.drow][n] |= 2; resv.delete(key(jr, jc));
+      }
+    }
+
+    const cells = Array.from({ length: rows }, () => Array(cols).fill(null)), planted = [];
+    for (let r = 0; r < rows; r++) for (let c = 1; c <= n; c++) if (conn[r][c]) { const cell = { base: conn[r][c], rot: 0, angle: 0, planted: true }; cells[r][c] = cell; planted.push(cell); }
+    jobs.forEach(j => { j.srows.forEach((r, i) => { cells[r][0] = { base: 2, rot: 0, angle: 0, fixed: 'source', bits: j.src[i] }; }); cells[j.drow][cols - 1] = { base: 8, rot: 0, angle: 0, fixed: 'drain', need: j.need }; });
+    const d = spec.d, pEmpty = 0.14 - 0.10 * d;
+    for (let r = 0; r < rows; r++) for (let c = 1; c <= n; c++) {
+      if (cells[r][c]) continue;
+      if (rng() < pEmpty) continue;
+      const y = rng(), b = y < 0.30 ? 5 : y < 0.72 ? 3 : y < 0.88 + 0.1 * d ? 7 : 15;
+      cells[r][c] = { base: b, rot: ri(4), angle: 0 };
+    }
+    const L = { n, rows, cols, cells, planted, jobs, spec, state: 'play', flow: null, moves: 0, flows: 0, par: 0, hover: null, cur: { r: 0, c: 1 }, cs: 60 };
+    G = L;
+    let tries = 0;
+    do { planted.forEach(c => { c.rot = ri(4); }); L.par = calcPar(L); tries++; }
+    while ((L.par < Math.max(3, Math.floor(planted.length * 0.45)) || evaluate().win) && tries < 80);
+    if (evaluate().win) return null;
+    return L;
+  }
+  function genLevel(node) {
+    const spec = specFor(node);
+    for (let a = 0; a < 1500; a++) {
+      rng = mulberry32(node.id * 7919 + 17 + a * 104729);
+      const L = tryGen(a < 500 ? spec : Object.assign({}, spec, { wind: 0 }));
+      if (L) { rng = Math.random; return L; }
+    }
+    rng = Math.random; return null;
+  }
+  function calcPar(L) { let p = 0; for (const c of L.planted) for (let k = 0; k < 4; k++) if (rotMask(c.base, c.rot + k) === c.base) { p += k; break; } return p; }
+
+  /* ---------- simulation ---------- */
+  let G = null;
+  const maskOf = c => rotMask(c.base, c.rot);
+  const cellAt = (r, c) => (!G || r < 0 || r >= G.rows || c < 0 || c >= G.cols) ? null : G.cells[r][c];
+  const subOf = (cell, d) => cell.base === 15 ? (d & 1) : 0;
+  const nodeArms = (cell, s) => { const m = maskOf(cell); return cell.base !== 15 ? m : (s === 0 ? m & 5 : m & 10); };
+
+  function evaluate() {
+    const cols = G.cols, key = (r, c, s) => (r * cols + c) * 2 + s;
+    const dec = k => { const s = k & 1, i = k >> 1; return [Math.floor(i / cols), i % cols, s]; };
+    const leaksOf = [];
+    function nbrs(k, collect) {
+      const [r, c, s] = dec(k), cell = G.cells[r][c], out = [], arms = nodeArms(cell, s);
+      for (let d = 0; d < 4; d++) {
+        if (!(arms & (1 << d))) continue;
+        const nr = r + DR[d], nc = c + DC[d], nb = cellAt(nr, nc), od = (d + 2) % 4;
+        if (nb && (maskOf(nb) & (1 << od))) out.push([key(nr, nc, subOf(nb, od)), d]);
+        else if (collect) collect.push({ r, c, d, k });
+      }
+      return out;
+    }
+    const srcs = []; for (let r = 0; r < G.rows; r++) { const c = G.cells[r][0]; if (c && c.fixed === 'source') srcs.push({ r, bits: c.bits, k: key(r, 0, 0) }); }
+    const nodes = new Map();
+    srcs.forEach(s => {
+      const dist = new Map([[s.k, { dist: 0, entry: -1 }]]), q = [s.k];
+      for (let h = 0; h < q.length; h++) {
+        const k = q[h], dd = dist.get(k).dist;
+        for (const [k2, d] of nbrs(k)) if (!dist.has(k2)) { dist.set(k2, { dist: dd + 1, entry: (d + 2) % 4 }); q.push(k2); }
+      }
+      dist.forEach((v, k) => {
+        let n = nodes.get(k);
+        if (!n) { const [r, c, sub] = dec(k); n = { k, r, c, s: sub, dist: v.dist, entry: v.entry, arr: [] }; nodes.set(k, n); }
+        else if (v.dist < n.dist) { n.dist = v.dist; n.entry = v.entry; }
+        n.arr.push({ bits: s.bits, t: v.dist });
+      });
+    });
+    const comp = new Map(), compBits = [];
+    nodes.forEach((n, k) => {
+      if (comp.has(k)) return;
+      const id = compBits.length; compBits.push(0); comp.set(k, id);
+      const q = [k];
+      for (let h = 0; h < q.length; h++) for (const [k2] of nbrs(q[h])) if (!comp.has(k2)) { comp.set(k2, id); q.push(k2); }
+    });
+    srcs.forEach(s => { compBits[comp.get(s.k)] |= s.bits; });
+    const leaks = []; let max = 0;
+    nodes.forEach(n => { nbrs(n.k, leaks); if (n.dist > max) max = n.dist; });
+    const drains = [];
+    for (let r = 0; r < G.rows; r++) {
+      const c = G.cells[r][G.cols - 1];
+      if (!c || c.fixed !== 'drain') continue;
+      const k = key(r, G.cols - 1, 0), reached = nodes.has(k), bits = reached ? compBits[comp.get(k)] : 0;
+      drains.push({ r, k, reached, bits, need: c.need, ok: reached && bits === c.need });
+    }
+    return { nodes, srcs, drains, leaks, max, win: drains.length > 0 && drains.every(d => d.ok) && leaks.length === 0 };
+  }
+  const bitsAt = (n, t) => n.arr.reduce((a, x) => x.t <= t ? a | x.bits : a, 0);
+
+  function problems(ev) {
+    const out = [];
+    ev.drains.forEach(d => {
+      const nm = G.jobs.length > 1 ? `The ${liqName(d.need)} drain` : 'The drain';
+      if (!d.reached) out.push(`${nm} is dry.`);
+      else if (!d.ok) out.push(`${nm} got ${liqName(d.bits)} but needs ${liqName(d.need)}.`);
+    });
+    const l = ev.leaks.length;
+    if (l) out.push(`${l} open ${l === 1 ? 'end is' : 'ends are'} leaking.`);
+    return out.join(' ');
+  }
+
+  /* ---------- screens ---------- */
+  const VIEWS = ['menu', 'tree', 'shop', 'game'];
+  function show(v) {
+    VIEWS.forEach(x => { $('v-' + x).hidden = x !== v; });
+    document.querySelectorAll('.coin-val').forEach(e => { e.textContent = S.coins; });
+    if (v === 'menu') renderMenu();
+    if (v === 'tree') renderTree();
+    if (v === 'shop') renderShop();
+    window.scrollTo(0, 0);
+  }
+  document.addEventListener('click', e => { const b = e.target.closest('[data-nav]'); if (b) show(b.dataset.nav); });
+
+  const starsDone = () => Object.values(S.done).reduce((a, d) => a + d.stars, 0);
+  function continueId() { const n = byId[S.last]; return n && unlocked(n) ? n.id : 1; }
+  function renderMenu() {
+    const n = byId[continueId()], cleared = Object.keys(S.done).length;
+    $('mContinueLabel').textContent = cleared ? 'Continue' : 'Play';
+    $('mContinueMeta').textContent = 'Sheet ' + n.label;
+    $('mTreeMeta').textContent = cleared + ' of ' + NODES.length + ' cleared';
+    $('mShopMeta').textContent = S.coins + ' coins';
+    $('mStats').innerHTML = `<span>Stars <b>${starsDone()}</b></span><span>Coins <b>${S.coins}</b></span><span>Sheets cleared <b>${cleared}</b></span>`;
+  }
+  $('mContinue').addEventListener('click', () => startLevel(continueId()));
+
+  /* tree */
+  function renderTree() {
+    const svg = $('treeSvg'); let h = '';
+    NODES.forEach(n => { if (n.parent === null) return; const p = byId[n.parent];
+      const d = n.bonus ? `M${p.x} ${p.y} C${p.x} ${p.y - 46} ${n.x} ${n.y + 46} ${n.x} ${n.y}` : `M${p.x} ${p.y} L${n.x} ${n.y}`;
+      h += `<path class="t-link${S.done[n.parent] ? ' done' : ''}" d="${d}"/>`; });
+    TIERS.forEach(tr => { h += `<text class="t-label" x="372" y="${Y(tr.from) + 4}">${tr.name}</text>`; });
+    NODES.forEach(n => {
+      const open = unlocked(n), done = S.done[n.id], cls = 't-node ' + (done ? 'done' : open ? 'open' : 'locked');
+      const shape = n.bonus ? `<rect x="${n.x - 17}" y="${n.y - 17}" width="34" height="34" transform="rotate(45 ${n.x} ${n.y})"/>` : `<circle cx="${n.x}" cy="${n.y}" r="22"/>`;
+      let stars = ''; if (done) for (let i = 0; i < 3; i++) stars += `<circle class="t-star${i < done.stars ? ' on' : ''}" cx="${n.x - 10 + i * 10}" cy="${n.y + (n.bonus ? 30 : 33)}" r="3.5"/>`;
+      h += `<g class="${cls}" data-id="${n.id}" tabindex="${open ? 0 : -1}" role="button" aria-label="Sheet ${n.label}${done ? ', cleared' : open ? '' : ', locked'}">${shape}<text x="${n.x}" y="${n.y}">${n.label}</text>${stars}</g>`;
+    });
+    svg.setAttribute('viewBox', `0 0 380 ${TREE_H}`); svg.innerHTML = h;
+    const sc = $('treeScroll'), cur = byId[continueId()], k = svg.clientWidth / 380;
+    sc.scrollTop = Math.max(0, cur.y * k - sc.clientHeight / 2);
+  }
+  $('treeSvg').addEventListener('click', e => { const g = e.target.closest('.t-node'); if (g) startLevel(+g.dataset.id); });
+  $('treeSvg').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { const g = e.target.closest('.t-node'); if (g) { e.preventDefault(); startLevel(+g.dataset.id); } } });
+
+  /* shop */
+  let tab = 'pipe';
+  const swatch = (c, fallback) => c || fallback;
+  function renderShop() {
+    const items = tab === 'pipe' ? PIPES : WATERS, owned = S.owned[tab];
+    $('tabPipe').setAttribute('aria-pressed', tab === 'pipe'); $('tabWater').setAttribute('aria-pressed', tab === 'water');
+    $('shopNote').textContent = tab === 'pipe' ? 'Pipe finishes change how every pipe looks.' : 'Water colour is used on single-liquid sheets. Mixing sheets keep their own colours.';
+    $('shopGrid').innerHTML = items.map(it => {
+      const has = owned.includes(it.id), eq = S.equip[tab] === it.id;
+      const prev = tab === 'pipe'
+        ? `<svg viewBox="0 0 90 60" aria-hidden="true"><g fill="none" stroke-linecap="butt"><path d="M0 40 H40 Q58 40 58 22 V0" stroke-width="24" style="stroke:${swatch(it.c && it.c[1], 'var(--pipe-edge)')}"/><path d="M0 40 H40 Q58 40 58 22 V0" stroke-width="16" style="stroke:${swatch(it.c && it.c[0], 'var(--pipe)')}"/><path d="M0 35 H40 Q53 35 53 22 V0" stroke-width="3" style="stroke:${swatch(it.c && it.c[2], 'var(--pipe-hi)')}"/></g></svg>`
+        : `<svg viewBox="0 0 90 60" aria-hidden="true"><g fill="none"><path d="M0 40 H40 Q58 40 58 22 V0" stroke-width="24" style="stroke:var(--pipe-edge)"/><path d="M0 40 H40 Q58 40 58 22 V0" stroke-width="16" style="stroke:var(--pipe)"/><path d="M0 40 H40 Q58 40 58 22 V0" stroke-width="9" style="stroke:${swatch(it.c, 'var(--water)')}"/></g></svg>`;
+      const btn = eq ? '<button class="small" disabled>Equipped</button>' : has ? `<button class="small" data-act="equip" data-id="${it.id}">Equip</button>` : `<button class="small" data-act="buy" data-id="${it.id}" ${S.coins < it.price ? 'disabled' : ''}>Buy</button>`;
+      return `<div class="card${eq ? ' eq' : ''}">${prev}<h3>${it.name}</h3><span class="price">${has ? 'Owned' : `<i class="coin"></i>${it.price}`}</span>${btn}</div>`;
+    }).join('');
+  }
+  $('tabPipe').addEventListener('click', () => { tab = 'pipe'; renderShop(); });
+  $('tabWater').addEventListener('click', () => { tab = 'water'; renderShop(); });
+  $('shopGrid').addEventListener('click', e => {
+    const b = e.target.closest('button[data-act]'); if (!b) return;
+    const items = tab === 'pipe' ? PIPES : WATERS, it = items.find(x => x.id === b.dataset.id);
+    if (b.dataset.act === 'buy') { if (S.coins < it.price || S.owned[tab].includes(it.id)) return; S.coins -= it.price; S.owned[tab].push(it.id); S.equip[tab] = it.id; }
+    else if (S.owned[tab].includes(it.id)) S.equip[tab] = it.id;
+    save(); applySkins(); document.querySelectorAll('.coin-val').forEach(e2 => { e2.textContent = S.coins; }); renderShop();
+  });
+
+  /* ---------- playing a sheet ---------- */
+  function startLevel(id) {
+    const node = byId[id]; if (!node || !unlocked(node)) return;
+    const L = genLevel(node); if (!L) return;
+    G = L; G.node = node; S.last = id; save();
+    show('game');
+    each(c => { c.angle = c.rot * Math.PI / 2; });
+    G.initRots = []; each(c => { G.initRots.push(c.rot); });
+    $('win').hidden = true; $('flow').disabled = false; setStatus('');
+    $('gLabel').textContent = node.label;
+    $('gTier').textContent = TIERS[G.spec.ti].name + (node.bonus ? ' (bonus, double coins)' : '');
+    $('brief').innerHTML = briefHtml(); hud(); resize(); cvs.focus({ preventScroll: true });
+  }
+  function briefHtml() {
+    const dot = b => `<i class="dot" style="background:${liqHex(b)}"></i>`;
+    if (G.spec.tier === 'A') return '<span>Get the water to the drain and seal every open end.</span>';
+    const jobs = G.jobs.map(j => j.src.length > 1
+      ? `<span class="job">${j.src.map(b => dot(b) + liqName(b)).join(' + ')} makes ${dot(j.need)}<b>${liqName(j.need)}</b></span>`
+      : `<span class="job">${dot(j.need)}${liqName(j.need)} to the ${liqName(j.need)} drain</span>`).join('');
+    const notes = (G.spec.tier === 'B' ? 'Keep different liquids apart. ' : '') + (G.spec.cross ? 'Crossed pipes are bridges: liquids pass over each other without mixing.' : '');
+    return `<div class="jobs">${jobs}</div>${notes ? `<small>${notes}</small>` : ''}`;
+  }
+  function each(fn) { for (let r = 0; r < G.rows; r++) for (let c = 0; c < G.cols; c++) { const k = G.cells[r][c]; if (k && !k.fixed) fn(k, r, c); } }
+  function hud() { $('sMoves').textContent = G.moves; $('sPar').textContent = G.par; }
+  function setStatus(t) { $('status').textContent = t; }
+
+  function rotate(r, c, dir) {
+    const cell = cellAt(r, c);
+    if (!cell || cell.fixed || c < 1 || c > G.n) return;
+    if (G.state === 'flowing' || G.state === 'won') return;
+    if (G.state === 'settled') { G.flow = null; G.state = 'play'; setStatus(''); }
+    cell.rot += dir; G.moves++; hud();
+    if (reduce) cell.angle = cell.rot * Math.PI / 2;
+  }
+  function startFlow() {
+    if (!G || G.state === 'flowing' || G.state === 'won') return;
+    G.flows++;
+    G.flow = { ev: evaluate(), t0: performance.now() };
+    G.state = 'flowing'; $('flow').disabled = true; setStatus('Water moving…');
+  }
+  function settle() {
+    const ev = G.flow.ev; $('flow').disabled = false;
+    if (!ev.win) { G.state = 'settled'; setStatus(problems(ev) + ' Keep turning.'); return; }
+    G.state = 'won'; $('flow').disabled = true; setStatus('');
+    const node = G.node, t = node.t, ratio = G.moves / Math.max(1, G.par);
+    const stars = G.moves <= G.par ? 3 : ratio <= 1.4 ? 2 : 1;
+    const per = (G.spec.ti + 1) * 3 * (node.bonus ? 2 : 1), prev = S.done[node.id] ? S.done[node.id].stars : 0;
+    const gain = Math.max(0, stars - prev) * per;
+    if (stars >= prev) S.done[node.id] = { stars, turns: G.moves };
+    S.coins += gain;
+    const nx = nextOf(node); if (nx) S.last = nx.id;
+    save();
+    document.querySelectorAll('.coin-val').forEach(e => { e.textContent = S.coins; });
+    $('winStars').innerHTML = [0, 1, 2].map(i => `<span class="star${i < stars ? ' on' : ''}"></span>`).join('');
+    $('winText').textContent = `${G.moves} turns against par ${G.par}. ${G.flows} valve ${G.flows === 1 ? 'test' : 'tests'}. ` + (gain ? `You earned ${gain} coins.` : 'No new coins on a replay.');
+    const can = nx && unlocked(nx);
+    $('next').textContent = can ? 'Next sheet' : 'Level tree'; $('next').dataset.go = can ? nx.id : '';
+    setTimeout(() => { if (G.state === 'won') { $('win').hidden = false; $('next').focus({ preventScroll: true }); } }, 450);
+  }
+
+  /* ---------- drawing ---------- */
+  const cvs = $('board'), ctx = cvs.getContext('2d');
+  let last = performance.now();
+  function resize() {
+    if (!G) return;
+    const avail = Math.min($('boardWrap').parentElement.clientWidth - 4, 760);
+    const cs = Math.max(28, Math.min(84, Math.floor(avail / G.cols)));
+    G.cs = cs;
+    const dpr = window.devicePixelRatio || 1, w = cs * G.cols, h = cs * G.rows;
+    cvs.width = w * dpr; cvs.height = h * dpr; cvs.style.width = w + 'px'; cvs.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  function rr(x, y, w, h, r) { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); }
+
+  function drawPipe(cell, cx, cy, cs, col) {
+    const half = cs / 2, w1 = cs * 0.34, w2 = cs * 0.26, fw = cs * 0.44, ft = cs * 0.07;
+    const arms = []; for (let d = 0; d < 4; d++) if (cell.base & (1 << d)) arms.push(d);
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(cell.fixed ? 0 : cell.angle);
+    if (cell.base === 15) {
+      const gap = w1 / 2 + cs * 0.05;
+      const arm = (d, from, w, color) => { ctx.save(); ctx.rotate(d * Math.PI / 2); ctx.fillStyle = color; ctx.fillRect(-w / 2, -half, w, half - from); ctx.restore(); };
+      for (const d of [0, 2]) { arm(d, gap, w1, col.edge); } for (const d of [0, 2]) { arm(d, gap, w2, col.pipe); }
+      ctx.fillStyle = col.edge; ctx.fillRect(-half, -w1 / 2, cs, w1);
+      ctx.fillStyle = col.pipe; ctx.fillRect(-half, -w2 / 2, cs, w2);
+      ctx.fillStyle = col.hi; ctx.fillRect(-half, -w2 / 2 + cs * 0.03, cs, cs * 0.035);
+      ctx.fillStyle = col.edge; for (const sx of [-1, 1]) ctx.fillRect(sx * cs * 0.115 - 1.5, -w1 / 2 - 3, 3, w1 + 6);
+    } else {
+      const pass = (w, color) => {
+        ctx.fillStyle = color;
+        for (const d of arms) { ctx.save(); ctx.rotate(d * Math.PI / 2); ctx.fillRect(-w / 2, -half, w, half); ctx.restore(); }
+        ctx.beginPath(); ctx.arc(0, 0, w / 2, 0, 7); ctx.fill();
+      };
+      pass(w1, col.edge); pass(w2, col.pipe);
+      ctx.fillStyle = col.hi;
+      for (const d of arms) { ctx.save(); ctx.rotate(d * Math.PI / 2); ctx.fillRect(-w2 / 2 + cs * 0.03, -half, cs * 0.035, half - 1); ctx.restore(); }
+    }
+    for (const d of arms) {
+      ctx.save(); ctx.rotate(d * Math.PI / 2);
+      ctx.fillStyle = col.edge; ctx.fillRect(-fw / 2, -half, fw, ft);
+      ctx.fillStyle = col.pipe; ctx.fillRect(-fw / 2 + 1.5, -half + 1.5, fw - 3, ft - 3);
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  function drawWater(cx, cy, cs, arms, entry, p, hex, inner, col) {
+    const half = cs / 2, len = half - inner;
+    const tIn = entry < 0 ? 1 : Math.min(p / 0.5, 1), tOut = entry < 0 ? p : Math.max(0, (p - 0.5) * 2);
+    for (const [w, color] of [[0.2, col.edge], [0.14, hex]]) {
+      ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = cs * w; ctx.lineCap = 'butt';
+      for (let d = 0; d < 4; d++) {
+        if (!(arms & (1 << d))) continue;
+        const vx = DC[d], vy = DR[d]; ctx.beginPath();
+        if (d === entry) { ctx.moveTo(cx + vx * half, cy + vy * half); ctx.lineTo(cx + vx * (half - len * tIn), cy + vy * (half - len * tIn)); }
+        else { if (tOut <= 0) continue; ctx.moveTo(cx + vx * inner, cy + vy * inner); ctx.lineTo(cx + vx * (inner + len * tOut), cy + vy * (inner + len * tOut)); }
+        ctx.stroke();
+      }
+      if (inner === 0 && (entry < 0 || p > 0.5)) { ctx.beginPath(); ctx.arc(cx, cy, cs * w / 2, 0, 7); ctx.fill(); }
+    }
+  }
+
+  function frame(now) {
+    requestAnimationFrame(frame);
+    if (!G || $('v-game').hidden) { last = now; return; }
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const cs = G.cs, st = getComputedStyle(root), v = n => st.getPropertyValue(n).trim();
+    const wsk = WATERS.find(x => x.id === S.equip.water);
+    curWater = (wsk && wsk.c) || v('--water') || '#1389d4';
+    const col = { cell: v('--cell'), grid: v('--grid'), pipe: v('--skin-pipe') || v('--pipe'), edge: v('--skin-edge') || v('--pipe-edge'), hi: v('--skin-hi') || v('--pipe-hi'), ink: v('--ink'), accent: v('--accent'), leak: v('--leak') };
+    ctx.clearRect(0, 0, cvs.width, cvs.height);
+    each(c => { const t = c.rot * Math.PI / 2; c.angle += (t - c.angle) * Math.min(1, dt * 20); if (Math.abs(t - c.angle) < 0.002) c.angle = t; });
+    let el = 0, ev = null;
+    if (G.flow) {
+      ev = G.flow.ev; el = G.state === 'flowing' ? (now - G.flow.t0) / 1000 / STEP : 1e9;
+      if (G.state === 'flowing' && el > ev.max + 1.4) settle();
+    }
+    const tt = now / 1000, dim = new Map();
+    if (ev) ev.drains.forEach(d => dim.set(d.r, ev.nodes.get(d.k)));
+    // pass 1: backgrounds, tanks, pipes
+    for (let r = 0; r < G.rows; r++) for (let c = 0; c < G.cols; c++) {
+      const cell = G.cells[r][c], x = c * cs, y = r * cs, cx = x + cs / 2, cy = y + cs / 2, interior = c >= 1 && c <= G.n;
+      if (interior) { ctx.fillStyle = col.cell; ctx.fillRect(x, y, cs, cs); ctx.strokeStyle = col.grid; ctx.lineWidth = 1; ctx.strokeRect(x + .5, y + .5, cs - 1, cs - 1); }
+      if (!cell) continue;
+      if (cell.fixed === 'source') {
+        rr(x + cs * 0.06, cy - cs * 0.3, cs * 0.5, cs * 0.6, cs * 0.1);
+        ctx.fillStyle = liqHex(cell.bits); ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = col.edge; ctx.stroke();
+      }
+      if (cell.fixed === 'drain') {
+        const bx = x + cs * 0.44, by = cy - cs * 0.3, bw = cs * 0.5, bh = cs * 0.6, nd = dim.get(r);
+        rr(bx, by, bw, bh, cs * 0.1); ctx.fillStyle = col.cell; ctx.fill();
+        rr(bx, by, bw, bh, cs * 0.1); ctx.globalAlpha = 0.22; ctx.fillStyle = liqHex(cell.need); ctx.fill(); ctx.globalAlpha = 1;
+        if (nd) {
+          const lvl = Math.max(0, Math.min(1, (el - nd.dist - 0.4) * 0.5));
+          if (lvl > 0) { ctx.save(); rr(bx, by, bw, bh, cs * 0.1); ctx.clip(); ctx.fillStyle = liqHex(bitsAt(nd, el)); ctx.fillRect(bx, by + bh * (1 - lvl), bw, bh * lvl); ctx.restore(); }
+        }
+        rr(bx, by, bw, bh, cs * 0.1); ctx.lineWidth = 3; ctx.strokeStyle = liqHex(cell.need); ctx.stroke();
+        rr(bx - 1.5, by - 1.5, bw + 3, bh + 3, cs * 0.12); ctx.lineWidth = 1.5; ctx.strokeStyle = col.edge; ctx.stroke();
+      }
+      if (!interior && !cell.fixed) continue;
+      drawPipe(cell, cx, cy, cs, col);
+    }
+    // pass 2: water
+    if (ev) ev.nodes.forEach(n => {
+      const cell = G.cells[n.r][n.c], p = Math.max(0, Math.min(1, el - n.dist)); if (p <= 0) return;
+      const cx = n.c * cs + cs / 2, cy = n.r * cs + cs / 2, cross = cell.base === 15;
+      drawWater(cx, cy, cs, nodeArms(cell, n.s), n.entry, p, liqHex(bitsAt(n, el)), cross && n.s === 0 ? cs * 0.22 : 0, col);
+    });
+    // pass 3: leaks and labels
+    if (ev) ev.leaks.forEach(lk => {
+      const n = ev.nodes.get(lk.k), p = n ? Math.max(0, Math.min(1, el - n.dist)) : 0; if (p < 1) return;
+      const lx = lk.c * cs + cs / 2 + DC[lk.d] * cs / 2, ly = lk.r * cs + cs / 2 + DR[lk.d] * cs / 2, pulse = 1 + 0.25 * Math.sin(tt * 9 + lk.r + lk.c);
+      ctx.fillStyle = liqHex(bitsAt(n, el)); ctx.beginPath(); ctx.arc(lx, ly, cs * 0.09 * pulse, 0, 7); ctx.fill();
+      ctx.strokeStyle = col.leak; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(lx, ly, cs * 0.16 * pulse, 0, 7); ctx.stroke();
+    });
+    ctx.fillStyle = col.ink; ctx.font = `700 ${Math.round(cs * 0.17)}px "Chakra Petch", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let r = 0; r < G.rows; r++) {
+      if (G.cells[r][0] && G.cells[r][0].fixed === 'source') ctx.fillText('IN', cs * 0.31, r * cs + cs / 2 - cs * 0.42);
+      const dc = G.cells[r][G.cols - 1]; if (dc && dc.fixed === 'drain') ctx.fillText('OUT', (G.cols - 1) * cs + cs * 0.69, r * cs + cs / 2 - cs * 0.42);
+    }
+    const target = G.hover || (document.activeElement === cvs ? G.cur : null);
+    if (target && G.state !== 'flowing' && G.state !== 'won') {
+      const cell = cellAt(target.r, target.c);
+      if (cell && !cell.fixed) { ctx.strokeStyle = col.accent; ctx.lineWidth = 3; ctx.strokeRect(target.c * cs + 2, target.r * cs + 2, cs - 4, cs - 4); }
+    }
+  }
+
+  /* ---------- input ---------- */
+  let lastType = 'mouse';
+  const pos = e => { const b = cvs.getBoundingClientRect(); return { r: Math.floor((e.clientY - b.top) / G.cs), c: Math.floor((e.clientX - b.left) / G.cs) }; };
+  cvs.addEventListener('pointerdown', e => { lastType = e.pointerType; if (e.button !== 0) return; const p = pos(e); G.cur = p; rotate(p.r, p.c, 1); });
+  cvs.addEventListener('pointermove', e => { G.hover = e.pointerType === 'mouse' ? pos(e) : null; });
+  cvs.addEventListener('pointerleave', () => { if (G) G.hover = null; });
+  cvs.addEventListener('contextmenu', e => { e.preventDefault(); if (lastType === 'mouse') { const p = pos(e); rotate(p.r, p.c, -1); } });
+  cvs.addEventListener('keydown', e => {
+    const k = e.key, cur = G.cur;
+    if (k.startsWith('Arrow')) {
+      e.preventDefault(); const d = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 }[k];
+      cur.r = Math.max(0, Math.min(G.rows - 1, cur.r + DR[d])); cur.c = Math.max(1, Math.min(G.n, cur.c + DC[d]));
+    } else if (k === ' ' || k === 'Enter') { e.preventDefault(); rotate(cur.r, cur.c, e.shiftKey ? -1 : 1); }
+    else if (k === 'f' || k === 'F') startFlow();
+  });
+  $('flow').addEventListener('click', startFlow);
+  $('reset').addEventListener('click', () => {
+    if (G.state === 'flowing') return;
+    let i = 0; each(c => { c.rot = G.initRots[i++]; c.angle = c.rot * Math.PI / 2; });
+    G.flow = null; G.state = 'play'; G.moves = 0; G.flows = 0; $('win').hidden = true; $('flow').disabled = false; setStatus(''); hud();
+  });
+  $('next').addEventListener('click', () => { const id = $('next').dataset.go; if (id) startLevel(+id); else show('tree'); });
+  $('winTree').addEventListener('click', () => show('tree'));
+
+  // -- boot --
+  applySkins();
+  show('menu');
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
